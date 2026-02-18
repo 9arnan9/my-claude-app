@@ -1,15 +1,30 @@
 import Anthropic from "@anthropic-ai/sdk";
 import express from "express";
+import pkg from "pg";
 
+const { Pool } = pkg;
 const app = express();
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-app.use(express.json());
-app.use(express.static("public"));
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
-const sessions = {};
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS messages (
+    id SERIAL PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content JSONB NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+  )
+`);
+
+app.use(express.json({ limit: "20mb" }));
+app.use(express.static("public"));
 
 app.post("/chat", async (req, res) => {
   const { message, sessionId } = req.body;
@@ -18,50 +33,24 @@ app.post("/chat", async (req, res) => {
     return res.status(400).json({ error: "no message" });
   }
 
-  if (!sessions[sessionId]) {
-    sessions[sessionId] = [];
-  }
+  const result = await pool.query(
+    "SELECT role, content FROM messages WHERE session_id = $1 ORDER BY created_at ASC",
+    [sessionId]
+  );
+  const messages = result.rows.map((r) => ({ role: r.role, content: r.content }));
 
-  sessions[sessionId].push({ role: "user", content: message });
+  messages.push({ role: "user", content: message });
+
+  await pool.query(
+    "INSERT INTO messages (session_id, role, content) VALUES ($1, $2, $3)",
+    [sessionId, "user", JSON.stringify(message)]
+  );
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1024,
-    tools: [
-      {
-        type: "web_search_20250305",
-        name: "web_search",
-      }
-    ],
-    messages: sessions[sessionId],
+    tools: [{ type: "web_search_20250305", name: "web_search" }],
+    messages,
   });
 
-  // รวบรวมข้อความจาก response
-  const reply = response.content
-    .filter(block => block.type === "text")
-    .map(block => block.text)
-    .join("");
-
-  sessions[sessionId].push({ role: "assistant", content: response.content });
-
-  res.json({ reply });
-});
-
-app.get("/admin", async (req, res) => {
-  const result = await pool.query(
-    "SELECT session_id, role, created_at FROM messages ORDER BY created_at DESC LIMIT 50"
-  );
-  
-  let html = "<h2>Messages</h2><table border='1' cellpadding='8'><tr><th>Session</th><th>Role</th><th>Time</th></tr>";
-  
-  for (const row of result.rows) {
-    html += `<tr><td>${row.session_id}</td><td>${row.role}</td><td>${row.created_at}</td></tr>`;
-  }
-  
-  html += "</table>";
-  res.send(html);
-});
-
-app.listen(process.env.PORT || 3000, () => {
-  console.log("Server running");
-});
+  const reply = respons
