@@ -47,6 +47,21 @@ app.post("/chat", async (req, res) => {
   res.json({ reply });
 });
 
+app.get("/admin", async (req, res) => {
+  const result = await pool.query(
+    "SELECT session_id, role, created_at FROM messages ORDER BY created_at DESC LIMIT 50"
+  );
+  
+  let html = "<h2>Messages</h2><table border='1' cellpadding='8'><tr><th>Session</th><th>Role</th><th>Time</th></tr>";
+  
+  for (const row of result.rows) {
+    html += `<tr><td>${row.session_id}</td><td>${row.role}</td><td>${row.created_at}</td></tr>`;
+  }
+  
+  html += "</table>";
+  res.send(html);
+});
+
 app.listen(process.env.PORT || 3000, () => {
   console.log("Server running");
 });
