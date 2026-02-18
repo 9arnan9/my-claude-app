@@ -52,7 +52,11 @@
 
   <<script>
   // สร้าง sessionId แบบสุ่ม
-  const sessionId = Math.random().toString(36).substring(2);
+  let sessionId = localStorage.getItem("sessionId");
+if (!sessionId) {
+  sessionId = Math.random().toString(36).substring(2);
+  localStorage.setItem("sessionId", sessionId);
+}
 
   async function sendMessage() {
     const input = document.getElementById("userInput");
