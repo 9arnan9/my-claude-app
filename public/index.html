@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Chat with Claude</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+    #chatbox {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 16px;
+      height: 400px;
+      overflow-y: auto;
+      margin-bottom: 12px;
+      background: #f9f9f9;
+    }
+    .user { color: #0066cc; margin: 8px 0; }
+    .claude { color: #333; margin: 8px 0; }
+    #inputArea { display: flex; gap: 8px; }
+    #userInput {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    button {
+      padding: 8px 16px;
+      background: #0066cc;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:disabled { background: #aaa; }
+  </style>
+</head>
+<body>
+
+  <h2>💬 Chat with Claude</h2>
+  <div id="chatbox"></div>
+  <div id="inputArea">
+    <input id="userInput" type="text" placeholder="พิมพ์ข้อความ..." />
+    <button id="sendBtn" onclick="sendMessage()">ส่ง</button>
+  </div>
+
+  <<script>
+  // สร้าง sessionId แบบสุ่ม
+  const sessionId = Math.random().toString(36).substring(2);
+
+  async function sendMessage() {
+    const input = document.getElementById("userInput");
+    const chatbox = document.getElementById("chatbox");
+    const btn = document.getElementById("sendBtn");
+    const message = input.value.trim();
+
+    if (!message) return;
+
+    chatbox.innerHTML += `<p class="user">คุณ: ${message}</p>`;
+    input.value = "";
+    btn.disabled = true;
+    btn.textContent = "กำลังส่ง...";
+
+    const res = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, sessionId }), // ส่ง sessionId ไปด้วย
+    });
+
+    const data = await res.json();
+
+    chatbox.innerHTML += `<p class="claude">Claude: ${data.reply}</p>`;
+    chatbox.scrollTop = chatbox.scrollHeight;
+    btn.disabled = false;
+    btn.textContent = "ส่ง";
+  }
+
+  document.getElementById("userInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendMessage();
+  });
+</script>
+
+</body>
+</html>
