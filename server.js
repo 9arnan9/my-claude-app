@@ -9,7 +9,7 @@ const client = new Anthropic({
 app.use(express.json());
 app.use(express.static("public"));
 
-const sessions = {}; // เก็บประวัติแต่ละ session
+const sessions = {};
 
 app.post("/chat", async (req, res) => {
   const { message, sessionId } = req.body;
@@ -18,28 +18,35 @@ app.post("/chat", async (req, res) => {
     return res.status(400).json({ error: "no message" });
   }
 
-  // สร้าง session ใหม่ถ้ายังไม่มี
   if (!sessions[sessionId]) {
     sessions[sessionId] = [];
   }
 
-  // เพิ่มข้อความผู้ใช้เข้า history
   sessions[sessionId].push({ role: "user", content: message });
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1024,
+    tools: [
+      {
+        type: "web_search_20250305",
+        name: "web_search",
+      }
+    ],
     messages: sessions[sessionId],
   });
 
-  const reply = response.content[0].text;
+  // รวบรวมข้อความจาก response
+  const reply = response.content
+    .filter(block => block.type === "text")
+    .map(block => block.text)
+    .join("");
 
-  // เพิ่มคำตอบ Claude เข้า history
-  sessions[sessionId].push({ role: "assistant", content: reply });
+  sessions[sessionId].push({ role: "assistant", content: response.content });
 
   res.json({ reply });
 });
 
-app.listen(3000, () => {
-  console.log("Server running at http://localhost:3000");
+app.listen(process.env.PORT || 3000, () => {
+  console.log("Server running");
 });
